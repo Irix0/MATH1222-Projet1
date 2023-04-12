@@ -97,8 +97,8 @@ fig_c.update_layout(title="Probabilité de transition avec état initial c",
                     legend=dict(x=0, y=1, bgcolor='rgba(255, 255, 255, 0.5)', bordercolor='rgba(0, 0, 0, 0)'))
 
 # Show the figures
-#fig_uniform.show()
-#fig_c.show()
+fig_uniform.show()
+fig_c.show()
 
 #print("Matrice de transition à la puissance n:")
 #print(P_n)
