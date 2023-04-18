@@ -1,6 +1,11 @@
 import math
 import random
 
+def read_crypted_text(filename):
+    file = open(filename, "r")
+    crypted_string = file.readline()
+    return crypted_string
+
 # Reads a file that contains all possible symbols and creates a list of them
 def symbols_reading(filename):
     symbols = []
@@ -27,6 +32,7 @@ def create_dictionnaries(symbols):
         for j in symbols:
             transition_count[i][j] = 0
     return symb_count, theta, transition_count
+
 
 def probabilities(filename, char_count, transition_count):
     total_char = 0
@@ -55,12 +61,19 @@ def probabilities(filename, char_count, transition_count):
 
     return apparition_probabilities, transition_probabilities
 
-# Create a new substitution by swapping key1 and key2
-def create_new_theta(key1, key2, theta):
+# Create a new substitution code by swapping key1 and key2
+def swap_theta(key1, key2, theta):
     new_theta = theta.copy()
     new_theta[key2] = theta[key1]
     new_theta[key1] = theta[key2]
     return new_theta
+
+# Modify completely a susbtitution code by swapping each symbol to another one time
+def modify_substitution_code(theta):
+    for _ in range(len(theta)):
+        key1, key2 = random.sample(list(theta), 2)
+        theta = swap_theta(key1, key2, theta)
+    return
 
 # Calculate the likelihood of a string
 def calculate_likelihood(string, app_prob, trans_prob):
@@ -69,7 +82,7 @@ def calculate_likelihood(string, app_prob, trans_prob):
         try :
             likelihood += math.log(trans_prob[string[i]][string[i+1]])
         except:
-            likelihood += -100
+            likelihood += -10000
     return likelihood
 
 # Create a new string from another by using a substitution code
@@ -80,34 +93,48 @@ def decrypt(string, theta):
     return new_string
 
 # Determine the substitution code that has the best likelihood
-# Does not work
 def metropolis_hastings(string, theta, app_prob, trans_prob, nb_iter):
     likelihood = calculate_likelihood(string, app_prob, trans_prob)
+    best_theta = [likelihood, theta]
 
     i = 0
     while i < nb_iter:
         key1, key2 = random.sample(list(theta), 2)
-        new_theta = create_new_theta(key1, key2, theta)
+        new_theta = swap_theta(key1, key2, theta)
 
-        new_string = decrypt(string, theta)
+        new_string = decrypt(string, new_theta)
         new_likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
 
-        alpha = min(1, math.exp(new_likelihood - likelihood))
-        if random.random() < alpha:
+        alpha = min(0, new_likelihood - likelihood)
+
+        if math.log(random.random()) < alpha:
             theta = new_theta
             likelihood = new_likelihood
-        print(likelihood)
+            if best_theta[0] < likelihood:
+                best_theta = [likelihood, theta]
         i += 1
-    return theta
+    return best_theta
 
-string1 = "wlenhenhjhnlm,whwznwhwz" + '"' + "whwmhdzhzsk,t;wz):"
-print(string1)
+def find_susbtitution_code(crypted_string, theta, app_prob, trans_prob):
+    
+    best_theta = [float('-inf'), theta]
+    for _ in range(5):
+        theta = best_theta[1]
+        for _ in range(10):
+            new_theta = metropolis_hastings(crypted_string, theta, app_prob, trans_prob, 10000)
+            if best_theta[0] < new_theta[0]:
+                best_theta = new_theta
+        print(best_theta)
+    return best_theta[1]
+
+crypted_string = read_crypted_text("groupe-Louan_et_Van_de_Vyver-encryptedtext.txt")
 
 symbols = symbols_reading("symbols.txt")
 symb_count, theta, transition_count = create_dictionnaries(symbols)
+
 app_prob, trans_prob = probabilities("moby_dick.txt", symb_count, transition_count)
 
-theta = metropolis_hastings(string1, theta, app_prob, trans_prob, 10000)
-new_string = decrypt(string1, theta)
+theta = find_susbtitution_code(crypted_string, theta, app_prob, trans_prob)
+decrypted_string = decrypt(crypted_string, theta)
 
-print(new_string)
+print(decrypted_string)
