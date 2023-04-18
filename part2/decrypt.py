@@ -89,14 +89,14 @@ def metropolis_hastings(string, theta, app_prob, trans_prob, nb_iter):
         key1, key2 = random.sample(list(theta), 2)
         new_theta = create_new_theta(key1, key2, theta)
 
-        new_string = decrypt(string, theta)
+        new_string = decrypt(string, new_theta)
         new_likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
 
-        alpha = min(1, math.exp(new_likelihood - likelihood))
-        if random.random() < alpha:
+        alpha = min(0, likelihood - new_likelihood)
+        if likelihood < new_likelihood:
             theta = new_theta
             likelihood = new_likelihood
-        print(likelihood)
+            print(likelihood)
         i += 1
     return theta
 
@@ -107,7 +107,7 @@ symbols = symbols_reading("symbols.txt")
 symb_count, theta, transition_count = create_dictionnaries(symbols)
 app_prob, trans_prob = probabilities("moby_dick.txt", symb_count, transition_count)
 
-theta = metropolis_hastings(string1, theta, app_prob, trans_prob, 10000)
+theta = metropolis_hastings(string1, theta, app_prob, trans_prob, 1000000)
 new_string = decrypt(string1, theta)
 
 print(new_string)
