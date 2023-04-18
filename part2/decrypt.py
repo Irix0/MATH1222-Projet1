@@ -1,6 +1,8 @@
-import math
+import numpy as np
+from numpy import inf
 import random
 
+# Read a cryptes text from a file
 def read_crypted_text(filename):
     file = open(filename, "r")
     crypted_string = file.readline()
@@ -34,21 +36,22 @@ def create_dictionnaries(symbols):
     return symb_count, theta, transition_count
 
 
-def probabilities(filename, char_count, transition_count):
+def probabilities(char_count, transition_count, *filename):
     total_char = 0
 
     # Count the number of each symbols and their transitions by reading filename
-    file = open(filename, "r")
-    curr_char = file.read(1)
-    next_char = file.read(1)
-    while curr_char:
-        if curr_char in char_count :
-            char_count[curr_char] += 1
-            if next_char in transition_count[curr_char]:
-               transition_count[curr_char][next_char] += 1
-            total_char += 1
-        curr_char, next_char = next_char, file.read(1)
-    file.close()
+    for i in range(len(filename)):
+        file = open(filename[i])
+        curr_char = file.read(1)
+        next_char = file.read(1)
+        while curr_char:
+            if curr_char in char_count :
+                char_count[curr_char] += 1
+                if next_char in transition_count[curr_char]:
+                    transition_count[curr_char][next_char] += 1
+                total_char += 1
+            curr_char, next_char = next_char, file.read(1)
+        file.close()
 
     # Calculate the apparition probabilities and the transition probabilities
     apparition_probabilities = {}
@@ -73,15 +76,15 @@ def modify_substitution_code(theta):
     for _ in range(len(theta)):
         key1, key2 = random.sample(list(theta), 2)
         theta = swap_theta(key1, key2, theta)
-    return
+    return theta
 
 # Calculate the likelihood of a string
 def calculate_likelihood(string, app_prob, trans_prob):
-    likelihood = math.log(app_prob[string[0]])
+    likelihood = np.log(app_prob[string[0]])
     for i in range(len(string)-1):
-        try :
-            likelihood += math.log(trans_prob[string[i]][string[i+1]])
-        except:
+        if trans_prob[string[i]][string[i+1]] != 0.0:
+            likelihood += np.log(trans_prob[string[i]][string[i+1]])
+        else:
             likelihood += -10000
     return likelihood
 
@@ -97,8 +100,7 @@ def metropolis_hastings(string, theta, app_prob, trans_prob, nb_iter):
     likelihood = calculate_likelihood(string, app_prob, trans_prob)
     best_theta = [likelihood, theta]
 
-    i = 0
-    while i < nb_iter:
+    for _ in range(nb_iter):
         key1, key2 = random.sample(list(theta), 2)
         new_theta = swap_theta(key1, key2, theta)
 
@@ -107,24 +109,35 @@ def metropolis_hastings(string, theta, app_prob, trans_prob, nb_iter):
 
         alpha = min(0, new_likelihood - likelihood)
 
-        if math.log(random.random()) < alpha:
+        if np.log(random.random()) < alpha:
             theta = new_theta
             likelihood = new_likelihood
             if best_theta[0] < likelihood:
                 best_theta = [likelihood, theta]
-        i += 1
     return best_theta
 
+# Find the best substitution code
 def find_susbtitution_code(crypted_string, theta, app_prob, trans_prob):
-    
-    best_theta = [float('-inf'), theta]
-    for _ in range(5):
+    likelihood = -inf
+    best_theta = theta
+
+    # Try 10 random theta to begin with and keep the code related to the best likelihood
+    for _ in range(10):
+        theta = modify_substitution_code(theta)
+        new_string = decrypt(crypted_string, theta)
+        new_likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
+        if new_likelihood > likelihood:
+            likelihood = new_likelihood
+            best_theta = theta
+
+    # Try 10 different chains with the same begin point keep the best one and repeat it 10 times
+    best_theta = [-inf, theta]
+    for _ in range(10):
         theta = best_theta[1]
         for _ in range(10):
             new_theta = metropolis_hastings(crypted_string, theta, app_prob, trans_prob, 10000)
             if best_theta[0] < new_theta[0]:
                 best_theta = new_theta
-        print(best_theta)
     return best_theta[1]
 
 crypted_string = read_crypted_text("groupe-Louan_et_Van_de_Vyver-encryptedtext.txt")
@@ -132,7 +145,7 @@ crypted_string = read_crypted_text("groupe-Louan_et_Van_de_Vyver-encryptedtext.t
 symbols = symbols_reading("symbols.txt")
 symb_count, theta, transition_count = create_dictionnaries(symbols)
 
-app_prob, trans_prob = probabilities("moby_dick.txt", symb_count, transition_count)
+app_prob, trans_prob = probabilities(symb_count, transition_count, "moby_dick.txt")
 
 theta = find_susbtitution_code(crypted_string, theta, app_prob, trans_prob)
 decrypted_string = decrypt(crypted_string, theta)
