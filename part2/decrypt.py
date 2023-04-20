@@ -1,6 +1,7 @@
 import numpy as np
 from numpy import inf
 import random
+from multiprocessing import Pool
 
 # Read a cryptes text from a file
 def read_crypted_text(filename):
@@ -21,21 +22,21 @@ def symbols_reading(filename):
     file.close()
     return symbols
 
-# Create a dictionnary for the symbol counter, a dictionnary for theta and a dictrionnary for the transitions between symbols
+# Create a dictionnary for the symbol counter, a dictionnary for code and a dictrionnary for the transitions between symbols
 def create_dictionnaries(symbols):
     symb_count = {}
-    theta = {}
+    code = {}
     transition_count = {}
 
     for i in symbols:
         symb_count[i] = 0
-        theta[i] = i
+        code[i] = i
         transition_count[i] = {}
         for j in symbols:
             transition_count[i][j] = 0
-    return symb_count, theta, transition_count
+    return symb_count, code, transition_count
 
-
+# Calculate the apparition probability of characters and the transition probabilities
 def probabilities(char_count, transition_count, *filename):
     total_char = 0
 
@@ -65,18 +66,18 @@ def probabilities(char_count, transition_count, *filename):
     return apparition_probabilities, transition_probabilities
 
 # Create a new substitution code by swapping key1 and key2
-def swap_theta(key1, key2, theta):
-    new_theta = theta.copy()
-    new_theta[key2] = theta[key1]
-    new_theta[key1] = theta[key2]
-    return new_theta
+def swap_code(key1, key2, code):
+    new_code = code.copy()
+    new_code[key2] = code[key1]
+    new_code[key1] = code[key2]
+    return new_code
 
 # Modify completely a susbtitution code by swapping each symbol to another one time
-def modify_substitution_code(theta):
-    for _ in range(len(theta)):
-        key1, key2 = random.sample(list(theta), 2)
-        theta = swap_theta(key1, key2, theta)
-    return theta
+def modify_substitution_code(code):
+    for _ in range(len(code)):
+        key1, key2 = random.sample(list(code), 2)
+        code = swap_code(key1, key2, code)
+    return code
 
 # Calculate the likelihood of a string
 def calculate_likelihood(string, app_prob, trans_prob):
@@ -89,65 +90,87 @@ def calculate_likelihood(string, app_prob, trans_prob):
     return likelihood
 
 # Create a new string from another by using a substitution code
-def decrypt(string, theta):
+def decrypt(string, code):
     new_string = ""
     for i in range(len(string)):
-        new_string += theta[string[i]]
+        new_string += code[string[i]]
     return new_string
 
 # Determine the substitution code that has the best likelihood
-def metropolis_hastings(string, theta, app_prob, trans_prob, nb_iter):
+def metropolis_hastings(args):
+    string, code, app_prob, trans_prob, nb_iter, job = args
     likelihood = calculate_likelihood(string, app_prob, trans_prob)
-    best_theta = [likelihood, theta]
+    best_find = {'likelihood' : likelihood, 'code' : code}
 
     for _ in range(nb_iter):
-        key1, key2 = random.sample(list(theta), 2)
-        new_theta = swap_theta(key1, key2, theta)
+        key1, key2 = random.sample(list(code), 2)
+        new_code = swap_code(key1, key2, code)
 
-        new_string = decrypt(string, new_theta)
+        new_string = decrypt(string, new_code)
         new_likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
 
         alpha = min(0, new_likelihood - likelihood)
 
         if np.log(random.random()) < alpha:
-            theta = new_theta
+            code = new_code
             likelihood = new_likelihood
-            if best_theta[0] < likelihood:
-                best_theta = [likelihood, theta]
-    return best_theta
+            if best_find['likelihood'] < likelihood:
+                best_find['likelihood'] = likelihood
+                best_find['code'] = code
+    return best_find
+
+# Multiprocess the instructions into different chains
+def start_job(string, code, app_prob, trans_prob, nb_iter, n_jobs=10):
+    jobs = []
+    for _ in range(0, n_jobs):
+        jobs.append((string, code, app_prob, trans_prob, nb_iter, _))
+
+    finds = Pool(5).map(metropolis_hastings, jobs)
+    best_find = {'likelihood' : -inf, 'code' : code}
+    for find in finds:
+        if find['likelihood'] > best_find['likelihood']:
+            best_find = find
+    return best_find
 
 # Find the best substitution code
-def find_susbtitution_code(crypted_string, theta, app_prob, trans_prob):
-    likelihood = -inf
-    best_theta = theta
+def find_susbtitution_code(crypted_string, code, app_prob, trans_prob):
+    best_find = {'likelihood' : -inf, 'code' : code}
 
-    # Try 10 random theta to begin with and keep the code related to the best likelihood
+    # Try 10 random code to begin with and keep the code related to the best likelihood
     for _ in range(10):
-        theta = modify_substitution_code(theta)
-        new_string = decrypt(crypted_string, theta)
-        new_likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
-        if new_likelihood > likelihood:
-            likelihood = new_likelihood
-            best_theta = theta
+        code = modify_substitution_code(code)
+        new_string = decrypt(crypted_string, code)
+        likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
+        if likelihood > best_find['likelihood']:
+            best_find['likelihood'] = likelihood
+            best_find['code'] = code
 
-    # Try 10 different chains with the same begin point keep the best one and repeat it 10 times
-    best_theta = [-inf, theta]
-    for _ in range(10):
-        theta = best_theta[1]
-        for _ in range(10):
-            new_theta = metropolis_hastings(crypted_string, theta, app_prob, trans_prob, 10000)
-            if best_theta[0] < new_theta[0]:
-                best_theta = new_theta
-    return best_theta[1]
+    # Keep the best substitution code found and repeat it nb_iter times
+    nb_iter = 5
+    print("Initializing decryption... (" + str(nb_iter) + " iterations)")
+    for i in range(nb_iter):
+        find = start_job(crypted_string, best_find['code'], app_prob, trans_prob, 10000)
+        if find['likelihood'] > best_find['likelihood']:
+            best_find = find
+        print("Iteration " + str(i+1) + ". Best likelihood found: 10^(" + str(best_find['likelihood'])+ ")")
 
+    print("Decryption finished")
+    return best_find['code']
+
+
+# Program to find the substitution code
 crypted_string = read_crypted_text("groupe-Louan_et_Van_de_Vyver-encryptedtext.txt")
 
 symbols = symbols_reading("symbols.txt")
-symb_count, theta, transition_count = create_dictionnaries(symbols)
+symb_count, code, transition_count = create_dictionnaries(symbols)
 
 app_prob, trans_prob = probabilities(symb_count, transition_count, "moby_dick.txt")
 
-theta = find_susbtitution_code(crypted_string, theta, app_prob, trans_prob)
-decrypted_string = decrypt(crypted_string, theta)
+code = find_susbtitution_code(crypted_string, code, app_prob, trans_prob)
+decrypted_string = decrypt(crypted_string, code)
 
+print("\nBest susbtitution code found:")
+print(code)
+
+print("\nDecrypted text:")
 print(decrypted_string)
