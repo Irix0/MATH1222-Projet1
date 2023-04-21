@@ -1,10 +1,13 @@
+import sys
+sys.path.append('..')
+
 import numpy as np
 from numpy import inf
 import random
 from multiprocessing import Pool
 
 # Read a cryptes text from a file
-def read_crypted_text(filename):
+def read_text(filename):
     file = open(filename, "r")
     crypted_string = file.readline()
     return crypted_string
@@ -72,9 +75,9 @@ def swap_code(key1, key2, code):
     new_code[key1] = code[key2]
     return new_code
 
-# Modify completely a susbtitution code by swapping each symbol to another one time
+# Modify completely a susbtitution code by swapping symbols
 def modify_substitution_code(code):
-    for _ in range(len(code)):
+    for _ in range(len(code)*2):
         key1, key2 = random.sample(list(code), 2)
         code = swap_code(key1, key2, code)
     return code
@@ -96,9 +99,17 @@ def decrypt(string, code):
         new_string += code[string[i]]
     return new_string
 
+# Create a new string from another by using the inverse of the substitution code
+def crypt(string, code):
+    new_string = ""
+    inversed_code = {value: key for key, value in code.items()}
+    for i in range(len(string)):
+        new_string += inversed_code[string[i]]
+    return new_string
+
 # Determine the substitution code that has the best likelihood
 def metropolis_hastings(args):
-    string, code, app_prob, trans_prob, nb_iter, job = args
+    string, code, app_prob, trans_prob, nb_iter = args
     likelihood = calculate_likelihood(string, app_prob, trans_prob)
     best_find = {'likelihood' : likelihood, 'code' : code}
 
@@ -120,12 +131,13 @@ def metropolis_hastings(args):
     return best_find
 
 # Multiprocess the instructions into different chains
-def start_job(string, code, app_prob, trans_prob, nb_iter, n_jobs=10):
+def start_job(string, code, app_prob, trans_prob, nb_jobs = 10, nb_iter = 10000):
     jobs = []
-    for _ in range(0, n_jobs):
-        jobs.append((string, code, app_prob, trans_prob, nb_iter, _))
+    for _ in range(0, nb_jobs):
+        jobs.append((string, code, app_prob, trans_prob, nb_iter))
 
     finds = Pool(5).map(metropolis_hastings, jobs)
+
     best_find = {'likelihood' : -inf, 'code' : code}
     for find in finds:
         if find['likelihood'] > best_find['likelihood']:
@@ -133,7 +145,9 @@ def start_job(string, code, app_prob, trans_prob, nb_iter, n_jobs=10):
     return best_find
 
 # Find the best substitution code
-def find_susbtitution_code(crypted_string, code, app_prob, trans_prob):
+def find_susbtitution_code(crypted_string, code, app_prob, trans_prob, 
+    nb_restarts = 5, nb_jobs = 10, nb_iter = 10000):
+
     best_find = {'likelihood' : -inf, 'code' : code}
 
     # Try 10 random code to begin with and keep the code related to the best likelihood
@@ -145,32 +159,14 @@ def find_susbtitution_code(crypted_string, code, app_prob, trans_prob):
             best_find['likelihood'] = likelihood
             best_find['code'] = code
 
-    # Keep the best substitution code found and repeat it nb_iter times
-    nb_iter = 5
-    print("Initializing decryption... (" + str(nb_iter) + " iterations)")
-    for i in range(nb_iter):
-        find = start_job(crypted_string, best_find['code'], app_prob, trans_prob, 10000)
+    # Keep the best substitution code found and repeat it nb_restarts times
+    nb_restarts = 5
+    print("Initializing decryption... (" + str(nb_restarts) + " restarts)")
+    for i in range(nb_restarts):
+        find = start_job(crypted_string, best_find['code'], app_prob, trans_prob, nb_jobs, nb_iter)
         if find['likelihood'] > best_find['likelihood']:
             best_find = find
-        print("Iteration " + str(i+1) + ". Best likelihood found: 10^(" + str(best_find['likelihood'])+ ")")
+        print("Start #" + str(i+1) + ". Best likelihood found: 10^(" + str(best_find['likelihood'])+ ")")
 
     print("Decryption finished")
     return best_find['code']
-
-
-# Program to find the substitution code
-crypted_string = read_crypted_text("groupe-Louan_et_Van_de_Vyver-encryptedtext.txt")
-
-symbols = symbols_reading("symbols.txt")
-symb_count, code, transition_count = create_dictionnaries(symbols)
-
-app_prob, trans_prob = probabilities(symb_count, transition_count, "moby_dick.txt")
-
-code = find_susbtitution_code(crypted_string, code, app_prob, trans_prob)
-decrypted_string = decrypt(crypted_string, code)
-
-print("\nBest susbtitution code found:")
-print(code)
-
-print("\nDecrypted text:")
-print(decrypted_string)
