@@ -1,6 +1,3 @@
-import sys
-sys.path.append('..')
-
 import numpy as np
 from numpy import inf
 import random
@@ -89,7 +86,7 @@ def calculate_likelihood(string, app_prob, trans_prob):
         if trans_prob[string[i]][string[i+1]] != 0.0:
             likelihood += np.log(trans_prob[string[i]][string[i+1]])
         else:
-            likelihood += -10000
+            likelihood += -10
     return likelihood
 
 # Create a new string from another by using a substitution code
@@ -107,11 +104,14 @@ def crypt(string, code):
         new_string += inversed_code[string[i]]
     return new_string
 
-# Determine the substitution code that has the best likelihood
+# Determine the substitution code that has the best likelihood and return it
 def metropolis_hastings(args):
-    string, code, app_prob, trans_prob, nb_iter = args
+    string, code, app_prob, trans_prob, nb_iter, stat_mode = args
     likelihood = calculate_likelihood(string, app_prob, trans_prob)
     best_find = {'likelihood' : likelihood, 'code' : code}
+
+    if stat_mode:
+        likelihood_list = []
 
     for _ in range(nb_iter):
         key1, key2 = random.sample(list(code), 2)
@@ -120,21 +120,28 @@ def metropolis_hastings(args):
         new_string = decrypt(string, new_code)
         new_likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
 
+        if stat_mode:
+            likelihood_list.append(likelihood)
+
         alpha = min(0, new_likelihood - likelihood)
 
         if np.log(random.random()) < alpha:
             code = new_code
             likelihood = new_likelihood
-            if best_find['likelihood'] < likelihood:
+            if not stat_mode and best_find['likelihood'] < likelihood:
                 best_find['likelihood'] = likelihood
                 best_find['code'] = code
-    return best_find
+            
+    if not stat_mode:
+        return best_find
+    else:
+        return likelihood_list
 
-# Multiprocess the instructions into different chains
-def start_job(string, code, app_prob, trans_prob, nb_jobs = 10, nb_iter = 10000):
+# Multiprocess the instructions into different chains and take the best one
+def start_decryption(string, code, app_prob, trans_prob, nb_jobs = 5, nb_iter = 8000):
     jobs = []
     for _ in range(0, nb_jobs):
-        jobs.append((string, code, app_prob, trans_prob, nb_iter))
+        jobs.append((string, code, app_prob, trans_prob, nb_iter, False))
 
     finds = Pool(5).map(metropolis_hastings, jobs)
 
@@ -144,26 +151,24 @@ def start_job(string, code, app_prob, trans_prob, nb_jobs = 10, nb_iter = 10000)
             best_find = find
     return best_find
 
+# Multiprocess the instruction into different chains and returns the result
+def study_convergence(string, code, app_prob, trans_prob, nb_jobs = 5, nb_iter = 5000):
+    jobs = []
+    for _ in range(0, nb_jobs):
+        jobs.append((string, code, app_prob, trans_prob, nb_iter, True))
+
+    likelihoods = Pool(5).map(metropolis_hastings, jobs)
+    return likelihoods
+
 # Find the best substitution code
 def find_susbtitution_code(crypted_string, code, app_prob, trans_prob, 
-    nb_restarts = 5, nb_jobs = 10, nb_iter = 10000):
-
+    nb_restarts = 5, nb_jobs = 5, nb_iter = 5000):
     best_find = {'likelihood' : -inf, 'code' : code}
 
-    # Try 10 random code to begin with and keep the code related to the best likelihood
-    for _ in range(10):
-        code = modify_substitution_code(code)
-        new_string = decrypt(crypted_string, code)
-        likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
-        if likelihood > best_find['likelihood']:
-            best_find['likelihood'] = likelihood
-            best_find['code'] = code
-
     # Keep the best substitution code found and repeat it nb_restarts times
-    nb_restarts = 5
     print("Initializing decryption... (" + str(nb_restarts) + " restarts)")
     for i in range(nb_restarts):
-        find = start_job(crypted_string, best_find['code'], app_prob, trans_prob, nb_jobs, nb_iter)
+        find = start_decryption(crypted_string, best_find['code'], app_prob, trans_prob, nb_jobs, nb_iter)
         if find['likelihood'] > best_find['likelihood']:
             best_find = find
         print("Start #" + str(i+1) + ". Best likelihood found: 10^(" + str(best_find['likelihood'])+ ")")

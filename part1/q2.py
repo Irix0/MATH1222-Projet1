@@ -1,7 +1,6 @@
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 import numpy as np
-import matplotlib.pyplot as plt
 import math
 
 def q(x, y, r):
@@ -95,7 +94,7 @@ for r in rs:
 
     # ajout d'un titre au graphique
     fig.update_layout(title_text="Convergence de la moyenne et de la variance<br><sup>Paramètres : p = {}, K = {}, r = {}, n = {}</sup>".format(p, K, r, n))
-    #fig.show()
+    fig.show()
 
     # Récupérrez les fréquences d'apparition de chaque valeur de x
     x, counts = np.unique(samples, return_counts=True)
