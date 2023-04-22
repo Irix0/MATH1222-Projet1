@@ -23,20 +23,22 @@ for i in range(249, len(crypted_string), 250):
     likelihood_list = study_convergence(crypted_string[:i], code, app_prob, trans_prob, nb_jobs, nb_iter)
 
     fig = make_subplots(rows=2, cols=1, subplot_titles=("Convergence de la vraisemblance", "Vraisemblance empirique"))
+
     for j in range(len(likelihood_list)):
         guesses = []
 
         best_guess = likelihood_list[j][0]
-        percent = (likelihood_list[j][0] - uncrypted_likelihood / -uncrypted_likelihood) * 100
+        percent = ((likelihood_list[j][0] - uncrypted_likelihood) / -uncrypted_likelihood) * 100
         for k in range(1,len(likelihood_list[j])):
             if likelihood_list[j][k] > best_guess:
                 best_guess = likelihood_list[j][k]
-                percent = (likelihood_list[j][k] - uncrypted_likelihood / -uncrypted_likelihood) * 100
+                percent = ((likelihood_list[j][k] - uncrypted_likelihood) / -uncrypted_likelihood) * 100
             guesses.append(percent)
-        fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=guesses, name = 'Chaîne' + str(j+1)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=guesses, name = 'Chaîne ' + str(j+1)), row=1, col=1)
+        j += 1
 
     for l in range(len(likelihood_list)):
-        fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=likelihood_list[l], name = 'Chaîne' + str(l+1)), row=2, col=1)
+        fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=likelihood_list[l], name = 'Chaîne ' + str(l+1)), row=2, col=1)
 
     fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=[uncrypted_likelihood]*nb_iter, name = 'Vraisemblance théorique', line=dict(dash='dash')), row=2, col=1)
 
