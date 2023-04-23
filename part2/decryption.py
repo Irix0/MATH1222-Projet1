@@ -121,7 +121,7 @@ def metropolis_hastings(args):
         new_likelihood = calculate_likelihood(new_string, app_prob, trans_prob)
 
         if stat_mode:
-            likelihood_list.append(likelihood)
+            likelihood_list.append(new_likelihood)
 
         alpha = min(0, new_likelihood - likelihood)
 
@@ -138,7 +138,7 @@ def metropolis_hastings(args):
         return likelihood_list
 
 # Multiprocess the instructions into different chains and take the best one
-def start_decryption(string, code, app_prob, trans_prob, nb_jobs = 5, nb_iter = 8000):
+def start_decryption(string, code, app_prob, trans_prob, nb_jobs = 5, nb_iter = 5000):
     jobs = []
     for _ in range(0, nb_jobs):
         jobs.append((string, code, app_prob, trans_prob, nb_iter, False))

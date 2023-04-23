@@ -37,8 +37,7 @@ for i in range(249, len(crypted_string), 250):
         fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=guesses, name = 'Chaîne ' + str(j+1)), row=1, col=1)
         j += 1
 
-    for l in range(len(likelihood_list)):
-        fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=likelihood_list[l], name = 'Chaîne ' + str(l+1)), row=2, col=1)
+    fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=likelihood_list[0], name = 'Chaîne 1'), row=2, col=1)
 
     fig.add_trace(go.Scatter(x=list(range(nb_iter)), y=[uncrypted_likelihood]*nb_iter, name = 'Vraisemblance théorique', line=dict(dash='dash')), row=2, col=1)
 
