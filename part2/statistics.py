@@ -1,8 +1,9 @@
+# Create graphs to study the convergence of the algorithm
+
 from decryption import *
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 
-# Create graphs to study the convergence of the algorithm
 nb_iter = 5000
 nb_jobs = 5
 

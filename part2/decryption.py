@@ -1,3 +1,5 @@
+# Implements functions for using the Metropolis-Hastings algorithm
+
 import numpy as np
 from numpy import inf
 import random

@@ -1,6 +1,7 @@
+# Program to find the substitution code of an encrypted text
+
 from decryption import *
 
-# Program to find the substitution code
 crypted_string = read_text("texts/groupe-Louan_et_Van_de_Vyver-encryptedtext_20_04_2023.txt")
 
 symbols = symbols_reading("texts/symbols.txt")
